@@ -357,16 +357,35 @@
             regenAsymKeys();
         }
 
+        // 실제 랜덤한 값을 생성하도록 수정된 파라미터 생성 함수
         function regenAsymKeys() {
             if(currentAsymMethod === 'rsa') {
-                asymState = { e: 7, d: 3, n: 33 };
+                // RSA 파라미터 세트 무작위 선택 (교육용 소수 쌍)
+                const rsaPool = [
+                    { e: 7, d: 23, n: 143 }, // p=11, q=13
+                    { e: 3, d: 7, n: 33 },   // p=3, q=11
+                    { e: 13, d: 37, n: 77 }, // p=7, q=11
+                    { e: 7, d: 3, n: 33 }
+                ];
+                asymState = rsaPool[Math.floor(Math.random() * rsaPool.length)];
                 document.getElementById('asym-params').innerText = `공개키(E): ${asymState.e}, 모듈러(N): ${asymState.n}, 개인키(D): ${asymState.d}`;
             } else if(currentAsymMethod === 'dh') {
-                asymState = { p: 23, g: 5, otherB: 15 }; // Fixed example
+                // DH 공유 소수 및 생성자 무작위 생성
+                const dhPool = [
+                    { p: 23, g: 5, otherB: Math.floor(Math.random() * 10) + 2 },
+                    { p: 47, g: 3, otherB: Math.floor(Math.random() * 10) + 2 },
+                    { p: 17, g: 7, otherB: Math.floor(Math.random() * 10) + 2 }
+                ];
+                asymState = dhPool[Math.floor(Math.random() * dhPool.length)];
                 document.getElementById('asym-params').innerText = `공유 소수(P): ${asymState.p}, 생성자(G): ${asymState.g}, 상대방의 값: ${asymState.otherB}`;
             } else {
-                asymState = { p: 17, g: 3, h: 12, x: 10 };
-                document.getElementById('asym-params').innerText = `공개키(P:17, G:3, H:12), 개인키(X): 10`;
+                // ElGamal 시뮬레이션용 랜덤 값
+                const p = 17;
+                const g = 3;
+                const x = Math.floor(Math.random() * 10) + 2; // 개인키
+                const h = Number(BigInt(g) ** BigInt(x) % BigInt(p)); // 공개키의 일부
+                asymState = { p, g, h, x };
+                document.getElementById('asym-params').innerText = `공개키(P:${p}, G:${g}, H:${h}), 개인키(X): ${x}`;
             }
             runAsymmetric();
         }
@@ -376,19 +395,24 @@
             let out1 = "-", out2 = "-";
 
             if (currentAsymMethod === 'rsa') {
-                let cipher = BigInt(val) ** BigInt(asymState.e) % BigInt(asymState.n);
-                let plain = BigInt(cipher) ** BigInt(asymState.d) % BigInt(asymState.n);
-                out1 = cipher.toString(); out2 = plain.toString();
+                if (val >= asymState.n) {
+                    out1 = "입력값이 N보다 작아야 합니다";
+                    out2 = "N: " + asymState.n;
+                } else {
+                    let cipher = BigInt(val) ** BigInt(asymState.e) % BigInt(asymState.n);
+                    let plain = BigInt(cipher) ** BigInt(asymState.d) % BigInt(asymState.n);
+                    out1 = cipher.toString(); out2 = plain.toString();
+                }
             } else if (currentAsymMethod === 'dh') {
                 let myPub = BigInt(asymState.g) ** BigInt(val) % BigInt(asymState.p);
                 let shared = BigInt(asymState.otherB) ** BigInt(val) % BigInt(asymState.p);
                 out1 = myPub.toString(); out2 = shared.toString();
             } else { // ElGamal concept
-                let k = 3; // 임의의 값
+                let k = 3; // 임의의 비밀 값
                 let c1 = BigInt(asymState.g) ** BigInt(k) % BigInt(asymState.p);
                 let c2 = (BigInt(val) * (BigInt(asymState.h) ** BigInt(k))) % BigInt(asymState.p);
                 out1 = `(C1:${c1}, C2:${c2})`;
-                out2 = val.toString(); // 단순화 시뮬레이션
+                out2 = val.toString(); // 실제 복호화는 (C2 / C1^x) mod p 연산이 필요함
             }
             document.getElementById('asym-out1').innerText = out1;
             document.getElementById('asym-out2').innerText = out2;
